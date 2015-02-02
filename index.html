@@ -26,6 +26,13 @@ function valueArc(x, y, r, min, max, vp) {
   }
   return arc(x, y, r, valueAngle, midAngle)
 }
+function line(x, y, r, a) {
+  var ar = a * Math.PI / 180.0
+  return [
+    'M', x, y,
+    'L', x + r*Math.cos(ar), y - r*Math.sin(ar),
+  ].join(' ')
+}
 var Knob = React.createClass({
   componentDidMount: function() {
     var self = this
@@ -58,38 +65,55 @@ var Knob = React.createClass({
   render: function() {
     var value = Math.max(this.props.min, Math.min(this.props.max, this.props.value))
     var valuep = value / (this.props.max - this.props.min)
+    var valuea = this.props.minAngle + (this.props.maxAngle - this.props.minAngle) * valuep
     //<path d={describeArc(50, 50, 45, this.props.start, this.props.end)} fill="transparent" stroke="black" strokeWidth="5" />
     return <svg width="40px" height="40px" viewBox="0 0 100 100" version="1.1" xmlns="http://www.w3.org/2000/svg" >
       <path d={arc(50, 50, 45, true, this.props.minAngle, this.props.maxAngle)} fill="transparent" stroke="#3B3C40" strokeWidth="5" strokeLinecap="round" />
       <path d={valueArc(50, 50, 45, this.props.minAngle, this.props.maxAngle, valuep)} fill="transparent" stroke="#FC7E63" strokeWidth="5" strokeLinecap="round" />
+      <path d={line(50, 50, 45, valuea)} fill="transparent" stroke="#3B3C40" strokeWidth="5" strokeLinecap="round" />
     </svg>
   }
 })
 
 var Soundboard = React.createClass({
+  buttonText: function() {
+    if (this.state.isPlaying) {
+      return "pause"
+    }
+    return "play"
+  },
   componentDidMount: function() {
     this.osc = T("sin", {freq:this.state.freq, mul:0.25})
     this.osc.play()
   },
   componentDidUpdate: function() {
     this.osc.freq = this.state.freq
+    if (this.state.isPlaying) {
+      this.osc.play()
+    } else {
+      this.osc.pause()
+    }
   },
   getInitialState: function() {
     return {
       freq: 528.32,
-      semitone: 0
+      isPlaying: true
     }
   },
   onFreqChange: function(freq) {
     this.setState({freq: freq})
   },
-  onSemitoneChange: function(semitone) {
-    this.setState({semitone: semitone})
+  onButtonClick: function() {
+    if (this.state.isPlaying) {
+      this.setState({isPlaying: false})
+    } else {
+      this.setState({isPlaying: true})
+    }
   },
   render: function() {
     return <div>
-      <Knob value={this.state.freq} min="500" max="20000" step="100" onChange={this.onFreqChange} />
-      <Knob value={this.state.semitone} min="0" max="3" step="1" onChange={this.onSemitoneChange} />
+      <Knob value={this.state.freq} min="500" max="20000" step="250" onChange={this.onFreqChange} />
+      <button onClick={this.onButtonClick}>{this.buttonText()}</button>
     </div>
   }
 })
