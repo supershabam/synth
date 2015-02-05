@@ -1,158 +1,34 @@
 <!DOCTYPE html>
 <script src="/jsx.transformer.js"></script>
 <script src="/react.js"></script>
-<script src="/timbre.dev.js"></script>
-<script src="/keyboard.js"></script>
-<script src="rx.all.js"></script>
-<script src="/oscope.js" type="text/jsx"></script>
-<div id="oscope"></div>
-<div id="app"></div>
-<script type='text/jsx'>
-// a1 -> a2 arc counter-clockwise
-function arc(x, y, r, a1, a2) {
-  var a1r = a1 * Math.PI / 180.0
-  var a2r = a2 * Math.PI / 180.0
-  while (a2r < a1r) a2r = a2r + 2 * Math.PI
-  return [
-    'M', x + (r * Math.cos(a1r)), y - (r * Math.sin(a1r)),
-    'A', r, r, 0,
-    a2r - a1r < Math.PI ? '0' : '1', // large arc?
-    0, // counter-clockwise never take the sweep
-    x + (r * Math.cos(a2r)), y - (r * Math.sin(a2r))
-  ].join(' ')
-}
-function valueArc(x, y, r, min, max, vp) {
-  var valueAngle = min + (max - min) * vp
-  var midAngle = min + (max - min) * 0.5
-  if (vp < 0.5) {
-    return arc(x, y, r, midAngle, valueAngle)
+<script src="/rx.all.js"></script>
+<script>
+var keydowns = Rx.Observable.fromEvent(document, 'keydown')
+var keyups   = Rx.Observable.fromEvent(document, 'keyup')
+
+
+var chords = Rx.Observable.merge(
+  keydowns.map(function(e) {
+    return {t: 'keydown', e: e}
+  }),
+  keyups.map(function(e) {
+    return {t: 'keyup', e: e}
+  })
+).scan([], function(keys, e) {
+  var keyCode = e.e.keyCode
+  var i
+  if (e.t == 'keydown' && keys.indexOf(keyCode) == -1) {
+    keys = keys.concat([keyCode])
+  } else if (e.t == 'keyup' && (i = keys.indexOf(keyCode)) != -1) {
+    keys = keys.slice(0, i).concat(keys.slice(i+1))
   }
-  return arc(x, y, r, valueAngle, midAngle)
-}
-function line(x, y, r, a) {
-  var ar = a * Math.PI / 180.0
-  return [
-    'M', x, y,
-    'L', x + r*Math.cos(ar), y - r*Math.sin(ar),
-  ].join(' ')
-}
-var Knob = React.createClass({
-  componentDidMount: function() {
-    var self = this
-    var mouseup   = Rx.Observable.fromEvent(document,          'mouseup')
-    var mousemove = Rx.Observable.fromEvent(document,          'mousemove')
-    var mousedown = Rx.Observable.fromEvent(this.getDOMNode(), 'mousedown')
-    var ydrag     = mousedown.flatMap(function (md) {
-      var startY = md.clientY
-      var startValue = self.props.value
-      return mousemove.map(function (mm) {
-        mm.preventDefault()
-        var dy = mm.clientY - startY
-        return Math.floor(-dy / 3) * self.props.step + startValue
-      }).takeUntil(mouseup)
-    })
-    this.subscription = ydrag.subscribe(function (v) {
-      self.props.onChange(v)
-    })
-  },
-  componentWillUnmount: function() {
-    this.subscription.dispose()
-  },
-  getDefaultProps: function() {
-    // props: min, max, step = 1
-    return {
-      minAngle: 270, // degrees
-      maxAngle: 0
-    }
-  },
-  render: function() {
-    var value = Math.max(this.props.min, Math.min(this.props.max, this.props.value))
-    var valuep = value / (this.props.max - this.props.min)
-    var valuea = this.props.minAngle + (this.props.maxAngle - this.props.minAngle) * valuep
-    //<path d={describeArc(50, 50, 45, this.props.start, this.props.end)} fill="transparent" stroke="black" strokeWidth="5" />
-    return <svg width="40px" height="40px" viewBox="0 0 100 100" version="1.1" xmlns="http://www.w3.org/2000/svg" >
-      <path d={arc(50, 50, 45, true, this.props.minAngle, this.props.maxAngle)} fill="transparent" stroke="#3B3C40" strokeWidth="5" strokeLinecap="round" />
-      <path d={valueArc(50, 50, 45, this.props.minAngle, this.props.maxAngle, valuep)} fill="transparent" stroke="#FC7E63" strokeWidth="5" strokeLinecap="round" />
-      <path d={line(50, 50, 45, valuea)} fill="transparent" stroke="#3B3C40" strokeWidth="5" strokeLinecap="round" />
-    </svg>
+  if (keys.length > 2) {
+    keys = keys.slice(1)
   }
-})
+  return keys
+}).distinctUntilChanged()
 
-var Soundboard = React.createClass({
-  buttonText: function() {
-    if (this.state.isPlaying) {
-      return "pause"
-    }
-    return "play"
-  },
-  componentDidMount: function() {
-    var synth = T("OscGen", {wave:"saw", mul:0.25}).play();
-    var keydict = T("ndict.key");
-    var midicps = T("midicps");
-    this.osc = T("keyboard").on("keydown", function(e) {
-      console.log(midi)
-      var midi = keydict.at(e.keyCode);
-
-      if (midi) {
-        var freq = midicps.at(midi);
-        synth.noteOnWithFreq(freq, 100);
-      }
-    }).on("keyup", function(e) {
-      var midi = keydict.at(e.keyCode);
-      if (midi) {
-        synth.noteOff(midi, 100);
-      }
-    })
-    this.osc.play()
-  },
-  componentDidUpdate: function() {
-    this.osc.freq = this.state.freq
-    if (this.state.isPlaying) {
-      this.osc.play()
-    } else {
-      this.osc.pause()
-    }
-  },
-  getInitialState: function() {
-    return {
-      freq: 528.32,
-      isPlaying: true
-    }
-  },
-  onFreqChange: function(freq) {
-    this.setState({freq: freq})
-  },
-  onButtonClick: function() {
-    if (this.state.isPlaying) {
-      this.setState({isPlaying: false})
-    } else {
-      this.setState({isPlaying: true})
-    }
-  },
-  render: function() {
-    return <div>
-      <Knob value={this.state.freq} min="500" max="20000" step="250" onChange={this.onFreqChange} />
-      <button onClick={this.onButtonClick}>{this.buttonText()}</button>
-    </div>
-  }
-})
-
-React.render(
-  <Soundboard />,
-  document.getElementById('app')
-)
-
-
-navigator.mozGetUserMedia ({
-  audio: true
-}, function(stream) {
-  var audioCtx = new AudioContext()
-  source = audioCtx.createMediaStreamSource(stream)
-  React.render(
-    <Oscope audioCtx={audioCtx} source={source} />,
-    document.getElementById('oscope')
-  )
-}, function(err) {
-  console.log(err)
+chords.subscribe(function(e) {
+  console.log(e)
 })
 </script>
