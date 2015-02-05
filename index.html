@@ -6,6 +6,9 @@
 var keydowns = Rx.Observable.fromEvent(document, 'keydown')
 var keyups   = Rx.Observable.fromEvent(document, 'keyup')
 
+function isKeyboardKey(keyCode) {
+  'awsedftgyhujkolp;'
+}
 
 var chords = Rx.Observable.merge(
   keydowns.map(function(e) {
@@ -22,13 +25,35 @@ var chords = Rx.Observable.merge(
   } else if (e.t == 'keyup' && (i = keys.indexOf(keyCode)) != -1) {
     keys = keys.slice(0, i).concat(keys.slice(i+1))
   }
-  if (keys.length > 2) {
+  if (keys.length > 5) {
     keys = keys.slice(1)
   }
   return keys
 }).distinctUntilChanged()
 
-chords.subscribe(function(e) {
-  console.log(e)
+var audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+var voices = {}
+chords.subscribe(function(keys) {
+  // remove dead voices
+  Object.keys(voices).map(function(x) {
+    return parseInt(x, 10)
+  }).forEach(function(key) {
+    if (keys.indexOf(key) == -1) {
+      voices[key].stop()
+      delete voices[key]
+    }
+  })
+  // add new voices
+  keys.forEach(function(key) {
+    if (!voices[key]) {
+      var oscillator = audioCtx.createOscillator()
+      oscillator.type = 'square'
+      oscillator.frequency.value = 440 + key // value in hertz
+      oscillator.start()
+      oscillator.connect(audioCtx.destination)
+      voices[key] = oscillator
+    }
+  })
+
 })
 </script>
