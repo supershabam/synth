@@ -2,7 +2,10 @@
 <script src="/jsx.transformer.js"></script>
 <script src="/react.js"></script>
 <script src="/timbre.dev.js"></script>
+<script src="/keyboard.js"></script>
 <script src="rx.all.js"></script>
+<script src="/oscope.js" type="text/jsx"></script>
+<div id="oscope"></div>
 <div id="app"></div>
 <script type='text/jsx'>
 // a1 -> a2 arc counter-clockwise
@@ -83,7 +86,23 @@ var Soundboard = React.createClass({
     return "play"
   },
   componentDidMount: function() {
-    this.osc = T("sin", {freq:this.state.freq, mul:0.25})
+    var synth = T("OscGen", {wave:"saw", mul:0.25}).play();
+    var keydict = T("ndict.key");
+    var midicps = T("midicps");
+    this.osc = T("keyboard").on("keydown", function(e) {
+      console.log(midi)
+      var midi = keydict.at(e.keyCode);
+
+      if (midi) {
+        var freq = midicps.at(midi);
+        synth.noteOnWithFreq(freq, 100);
+      }
+    }).on("keyup", function(e) {
+      var midi = keydict.at(e.keyCode);
+      if (midi) {
+        synth.noteOff(midi, 100);
+      }
+    })
     this.osc.play()
   },
   componentDidUpdate: function() {
@@ -122,4 +141,18 @@ React.render(
   <Soundboard />,
   document.getElementById('app')
 )
+
+
+navigator.mozGetUserMedia ({
+  audio: true
+}, function(stream) {
+  var audioCtx = new AudioContext()
+  source = audioCtx.createMediaStreamSource(stream)
+  React.render(
+    <Oscope audioCtx={audioCtx} source={source} />,
+    document.getElementById('oscope')
+  )
+}, function(err) {
+  console.log(err)
+})
 </script>
