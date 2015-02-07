@@ -3,57 +3,127 @@
 <script src="/react.js"></script>
 <script src="/rx.all.js"></script>
 <script>
-var keydowns = Rx.Observable.fromEvent(document, 'keydown')
-var keyups   = Rx.Observable.fromEvent(document, 'keyup')
+(function() {
+var m = {
+  "65": 60,
+  "87": 61,
+  "83": 62,
+  "69": 63,
+  "68": 64,
+  "70": 65,
+  "84": 66,
+  "71": 67,
+  "89": 68,
+  "72": 69,
+  "74": 70,
+  "73": 71,
+  "75": 72,
+  "79": 73,
+  "76": 74,
+  "186": 75,
+  "219": 76,
+  "222": 77
+}
+// todo turn maxVoices into a stream that is reacted to
+function Keyboard(maxVoices, keyMap) {
+  // todo close observables on close
+  var startOctave = 0
+  var minOctave = -3
+  var maxOctave = 3
+  var midiMax = 108
+  var midiMin = 21
+  var octaves = Rx.Observable.fromEvent(document, 'keypress')
+      .filter(function(e) {
+        return e.keyCode == 122 || e.keyCode == 120
+      })
+      .map(function(e) {
+        if (e.keyCode == 122) {
+          return -1
+        }
+        return 1
+      })
+      .scan(startOctave, function(octave, diff) {
+        return Math.min(maxOctave, Math.max(minOctave, octave + diff))
+      })
+      .startWith(startOctave)
+      .distinctUntilChanged()
 
-function isKeyboardKey(keyCode) {
-  'awsedftgyhujkolp;'
+  var keyChords = Rx.Observable.merge(
+    Rx.Observable.fromEvent(document, 'keydown')
+      .filter(function(e) {
+        return String(e.keyCode) in keyMap
+      })
+      ,
+    Rx.Observable.fromEvent(document, 'keyup')
+      .filter(function(e) {
+        return String(e.keyCode) in keyMap
+      })
+  ).scan([], function(chord, e) {
+    var key = e.keyCode
+    var i
+    if (e.type == 'keydown') {
+      if (chord.indexOf(key) == -1) {
+        // add chord key as newest
+        chord = chord.concat([key])
+      }
+    }
+    if (e.type == 'keyup') {
+      if ((i = chord.indexOf(key)) != -1) {
+        // remove unpressed chord key
+        chord = chord.slice(0, i).concat(chord.slice(i + 1))
+      }
+    }
+    if (chord.length > maxVoices) {
+      // remove oldest chord key
+      chord = chord.slice(1)
+    }
+    return chord
+  })
+  .distinctUntilChanged()
+
+  var midiChords = keyChords.withLatestFrom(octaves, function(chord, octave) {
+    return chord
+      .map(function(key) {
+        return keyMap[String(key)]
+      })
+      .map(function(d) {
+        return Math.min(midiMax, Math.max(midiMin, d + (12 * octave)))
+      })
+  })
+
+  var midiToFrequency = function(key) {
+    // http://newt.phys.unsw.edu.au/jw/notes.html
+    // http://en.wikipedia.org/wiki/MIDI_Tuning_Standard
+    return Math.pow(2, (key - 69)/12.0) * 440
+  }
+
+  var audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+  var voices = {}
+  midiChords.subscribe(function(keys) {
+    // remove dead voices
+    Object.keys(voices).map(function(x) {
+      return parseInt(x, 10)
+    }).forEach(function(key) {
+      if (keys.indexOf(key) == -1) {
+        voices[key].stop()
+        delete voices[key]
+      }
+    })
+    // add new voices
+    keys.forEach(function(key) {
+      if (!voices[key]) {
+        var oscillator = audioCtx.createOscillator()
+        oscillator.type = 'square'
+        oscillator.frequency.value = midiToFrequency(key) // value in hertz
+        oscillator.start()
+        oscillator.connect(audioCtx.destination)
+        voices[key] = oscillator
+      }
+    })
+  })
 }
 
-var chords = Rx.Observable.merge(
-  keydowns.map(function(e) {
-    return {t: 'keydown', e: e}
-  }),
-  keyups.map(function(e) {
-    return {t: 'keyup', e: e}
-  })
-).scan([], function(keys, e) {
-  var keyCode = e.e.keyCode
-  var i
-  if (e.t == 'keydown' && keys.indexOf(keyCode) == -1) {
-    keys = keys.concat([keyCode])
-  } else if (e.t == 'keyup' && (i = keys.indexOf(keyCode)) != -1) {
-    keys = keys.slice(0, i).concat(keys.slice(i+1))
-  }
-  if (keys.length > 5) {
-    keys = keys.slice(1)
-  }
-  return keys
-}).distinctUntilChanged()
+var k = new Keyboard(5, m)
+})()
 
-var audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-var voices = {}
-chords.subscribe(function(keys) {
-  // remove dead voices
-  Object.keys(voices).map(function(x) {
-    return parseInt(x, 10)
-  }).forEach(function(key) {
-    if (keys.indexOf(key) == -1) {
-      voices[key].stop()
-      delete voices[key]
-    }
-  })
-  // add new voices
-  keys.forEach(function(key) {
-    if (!voices[key]) {
-      var oscillator = audioCtx.createOscillator()
-      oscillator.type = 'square'
-      oscillator.frequency.value = 440 + key // value in hertz
-      oscillator.start()
-      oscillator.connect(audioCtx.destination)
-      voices[key] = oscillator
-    }
-  })
-
-})
 </script>
