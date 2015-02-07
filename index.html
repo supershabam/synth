@@ -24,6 +24,74 @@ var m = {
   "219": 76,
   "222": 77
 }
+
+function MIDIKey(note, velocity) {
+  this.note = note
+  this.velocity = velocity
+}
+
+// OctaveObservable returns an observable stream of the current octave to be
+// used to offset normal keyboard mappings
+function OctaveObservable() {
+  var startOctave = 0
+  return Rx.Observable.fromEvent(document, 'keypress')
+    .filter(function(e) {
+      console.log(e.keyCode)
+      return e.keyCode == 122 || e.keyCode == 120
+    })
+    .map(function(e) {
+      console.log('octave')
+      if (e.keyCode == 122) {
+        return -1
+      }
+      return 1
+    })
+    .scan(startOctave, function(octave, diff) {
+      return Math.min(maxOctave, Math.max(minOctave, octave + diff))
+    })
+    .startWith(startOctave)
+    .distinctUntilChanged()
+}
+
+// MIDIKeyObservable takes a mapping of keyboard keyCode to midi notes and produces
+// an observable stream of MIDIKey objects.
+function MIDIKeyObservable(keyMap) {
+  var activeKeys = {}
+  return Rx.Observable.fromEvent(document, 'keydown')
+    .filter(function(e) {
+      return e.keyCode in keyMap
+    })
+    .filter(function(e) {
+      return !(e.keyCode in activeKeys)
+    })
+    .do(function(downEvent) {
+      activeKeys[downEvent.keyCode] = true
+    })
+    .flatMap(function(downEvent) {
+      return Rx.Observable.merge(
+        Rx.Observable.of(new MIDIKey(downEvent.keyCode, 100)),
+        Rx.Observable.merge(
+          Rx.Observable.fromEvent(document, 'keyup')
+            .filter(function(upEvent) {
+              return upEvent.keyCode == downEvent.keyCode
+            })
+            .do(function(upEvent) {
+              delete activeKeys[upEvent.keyCode]
+            })
+            .map(function (upEvent) {
+              return new MIDIKey(upEvent.keyCode, 0)
+            })
+            // todo add octaves here to turn off keys when octave changes
+          )
+        .take(1)
+      )
+    })
+}
+
+MIDIKeyObservable(m, new OctaveObservable()).subscribe(function(e) {
+  console.log(e)
+})
+
 // todo turn maxVoices into a stream that is reacted to
 function Keyboard(maxVoices, keyMap) {
   // todo close observables on close
@@ -98,32 +166,50 @@ function Keyboard(maxVoices, keyMap) {
   }
 
   var audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-  var voices = {}
-  midiChords.subscribe(function(keys) {
-    // remove dead voices
-    Object.keys(voices).map(function(x) {
-      return parseInt(x, 10)
-    }).forEach(function(key) {
-      if (keys.indexOf(key) == -1) {
-        voices[key].stop()
-        delete voices[key]
-      }
-    })
-    // add new voices
-    keys.forEach(function(key) {
-      if (!voices[key]) {
-        var oscillator = audioCtx.createOscillator()
-        oscillator.type = 'square'
-        oscillator.frequency.value = midiToFrequency(key) // value in hertz
-        oscillator.start()
-        oscillator.connect(audioCtx.destination)
-        voices[key] = oscillator
-      }
-    })
-  })
+  var osc = new Oscillator(audioCtx)
+
+}
+
+function Oscillator(audioCtx) {
+  this.osc1 = audioCtx.createOscillator()
+  this.osc2 = audioCtx.createOscillator()
+  this.pfm = audioCtx.createGain()
+  this.f1 = audioCtx.createBiquadFilter()
+  this.f2 = audioCtx.createBiquadFilter()
+  this.amp1 = audioCtx.createGain()
+  this.amp2 = audioCtx.createGain()
+
+  this.osc1.type = 'saw'
+  this.osc1.start()
+  this.osc2.type = 'saw'
+  this.osc2.start()
+
+  this.pfm.gain.value = 0
+
+  this.f1.type = 'lowpass'
+  this.f1.frequency = 2000
+  this.f2.type = 'lowpass'
+  this.f2.frequency = 1500
+
+  this.osc1.connect(this.pfm)
+  this.osc2.connect(this.pfm)
+
+  this.pfm.connect(this.f1)
+  this.pfm.connect(this.f2)
+
+  this.f1.connect(this.f2)
+  this.f1.connect(this.amp1)
+  this.f2.connect(this.amp2)
+
+  this.amp1.connect(audioCtx.destination)
+  this.amp2.connect(audioCtx.destination)
 }
 
 var k = new Keyboard(5, m)
 })()
 
+/*
+stream of observable, cancellable notes
+
+*/
 </script>
