@@ -25,6 +25,12 @@ var m = {
   "222": 77
 }
 
+var midiToFrequency = function(key) {
+  // http://newt.phys.unsw.edu.au/jw/notes.html
+  // http://en.wikipedia.org/wiki/MIDI_Tuning_Standard
+  return Math.pow(2, (key - 69)/12.0) * 440
+}
+
 function MIDIKey(note, velocity) {
   this.note = note
   this.velocity = velocity
@@ -88,9 +94,82 @@ function MIDIKeyObservable(keyMap) {
     })
 }
 
-MIDIKeyObservable(m, new OctaveObservable()).subscribe(function(e) {
-  console.log(e)
-})
+function Synth(audioCtx, midiKeys) {
+  this.voices = {}
+  this.output = audioCtx.createGain()
+  this.audioCtx = audioCtx
+  midiKeys.subscribe(this.onmidikey.bind(this))
+}
+
+Synth.prototype.onmidikey = function(midiKey) {
+  if (this.voices[midiKey.note] && midiKey.velocity == 0) {
+    // kill voice
+    this.voices[midiKey.note].stop()
+    delete this.voices[midiKey.note]
+  } else if (this.voices[midiKey.note]) {
+    // update voice
+    this.voices[midiKey.note].velocity = midiKey.velocity
+  } else {
+    // add voice
+    this.voices[midiKey.note] = new Voice(this.audioCtx, midiKey.note, midiKey.velocity)
+  }
+  // TODO
+  // if (Object.keys(this.voices).length > 5) {
+  //   // crop voices if there are too many
+  // }
+  console.log(this.voices)
+
+}
+
+function Voice(audioCtx, midiNote, midiVelocity) {
+  this.audioCtx = audioCtx
+  this.osc1 = audioCtx.createOscillator()
+  this.osc2 = audioCtx.createOscillator()
+  this.pfm = audioCtx.createGain()
+  this.f1 = audioCtx.createBiquadFilter()
+  this.f2 = audioCtx.createBiquadFilter()
+  this.amp1 = audioCtx.createGain()
+  this.amp2 = audioCtx.createGain()
+
+  this.osc1.type = 'saw'
+  this.osc1.frequency = midiToFrequency(midiNote)
+  this.osc1.start()
+  this.osc2.type = 'saw'
+  this.osc2.frequency = midiToFrequency(midiNote)
+  this.osc2.start()
+
+  this.pfm.gain.value = 1
+
+  this.f1.type = 'lowpass'
+  this.f1.frequency = 2000
+  this.f2.type = 'lowpass'
+  this.f2.frequency = 1500
+
+  this.osc1.connect(this.pfm)
+  this.osc2.connect(this.pfm)
+
+  this.pfm.connect(this.f1)
+  this.pfm.connect(this.f2)
+
+  this.f1.connect(this.f2)
+  this.f1.connect(this.amp1)
+  this.f2.connect(this.amp2)
+
+  // TODO don't connect directly to output
+  this.amp1.connect(audioCtx.destination)
+  this.amp2.connect(audioCtx.destination)
+}
+
+Voice.prototype.stop = function() {
+  console.log(this.pfm)
+  this.pfm.gain.cancelScheduledValues(0)
+  this.pfm.gain.exponentialRampToValueAtTime(0.00001, this.audioCtx.currentTime + 1)
+}
+
+
+var audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+var midiKeys = new MIDIKeyObservable(m)
+var s = new Synth(audioCtx, midiKeys)
 
 // todo turn maxVoices into a stream that is reacted to
 function Keyboard(maxVoices, keyMap) {
@@ -159,13 +238,9 @@ function Keyboard(maxVoices, keyMap) {
       })
   })
 
-  var midiToFrequency = function(key) {
-    // http://newt.phys.unsw.edu.au/jw/notes.html
-    // http://en.wikipedia.org/wiki/MIDI_Tuning_Standard
-    return Math.pow(2, (key - 69)/12.0) * 440
-  }
 
-  var audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+
+
   var osc = new Oscillator(audioCtx)
 
 }
