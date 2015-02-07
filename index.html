@@ -95,7 +95,7 @@ var voices = {}
 kb2midi.subscribe(function(note) {
   if (!voices[note.note]) {
     var osc = audioCtx.createOscillator()
-    osc.type.value = 'saw'
+    osc.type = 'sawtooth'
     osc.start()
     osc.connect(gain)
     voices[note.note] = osc
