@@ -3,6 +3,7 @@
 <script src="/react.js"></script>
 <script src="/rx.all.js"></script>
 <script src="/kb2midi.js"></script>
+<script src="/oscope.js" type="text/jsx"></script>
 <script>
 (function() {
 
@@ -86,13 +87,17 @@ Voice.prototype.stop = function() {
 
 var audioCtx = new (window.AudioContext || window.webkitAudioContext)()
 var kb2midi = new KB2MIDI()
+var gain = audioCtx.createGain()
+window.gain = gain
+window.audioCtx = audioCtx
+gain.connect(audioCtx.destination)
 var voices = {}
 kb2midi.subscribe(function(note) {
   if (!voices[note.note]) {
     var osc = audioCtx.createOscillator()
     osc.type.value = 'saw'
     osc.start()
-    osc.connect(audioCtx.destination)
+    osc.connect(gain)
     voices[note.note] = osc
   }
   var osc = voices[note.note]
@@ -112,4 +117,8 @@ kb2midi.subscribe(function(note) {
 stream of observable, cancellable notes
 
 */
+</script>
+<div id="oscope"></div>
+<script type="text/jsx">
+React.render(<Oscope source={window.gain} audioCtx={window.audioCtx} />, document.getElementById('oscope'))
 </script>
