@@ -87,26 +87,39 @@ Voice.prototype.stop = function() {
 
 var audioCtx = new (window.AudioContext || window.webkitAudioContext)()
 var kb2midi = new KB2MIDI()
-var gain = audioCtx.createGain()
-window.gain = gain
+var globalGain = audioCtx.createGain()
+window.gain = globalGain
 window.audioCtx = audioCtx
 gain.connect(audioCtx.destination)
 var voices = {}
 kb2midi.subscribe(function(note) {
   if (!voices[note.note]) {
     var osc = audioCtx.createOscillator()
+    var gain = audioCtx.createGain()
+    osc.frequency.value = midiToFrequency(note.note)
     osc.type = 'sawtooth'
     osc.start()
+    gain.connect(globalGain)
     osc.connect(gain)
-    voices[note.note] = osc
+    voices[note.note] = {
+      osc: osc,
+      gain: gain
+    }
   }
-  var osc = voices[note.note]
+  var voice = voices[note.note]
   if (note.velocity == 0) {
-    osc.frequency.cancelScheduledValues(audioCtx.currentTime)
-    osc.frequency.setValueAtTime(0, audioCtx.currentTime)
+    // clear effects
+    voice.gain.gain.cancelScheduledValues(audioCtx.currentTime)
+    // release
+    voice.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5)
   } else {
-    osc.frequency.cancelScheduledValues(audioCtx.currentTime)
-    osc.frequency.setValueAtTime(midiToFrequency(note.note), audioCtx.currentTime)
+    // clear for effect
+    voice.gain.gain.cancelScheduledValues(audioCtx.currentTime)
+    voice.gain.gain.setValueAtTime(0.01, audioCtx.currentTime)
+    // attack
+    voice.gain.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.1)
+    // sustain
+    voice.gain.gain.setTargetAtTime(0.5, audioCtx.currentTime + 0.1, 0.1)
   }
 })
 // var midiKeys = new MIDIKeyObservable(m)
