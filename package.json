@@ -1,0 +1,31 @@
+{
+  "name": "synth",
+  "version": "1.0.0-SNAPSHOT",
+  "description": "web synth",
+  "main": "index.js",
+  "dependencies": {
+    "6to5-loader": "^3.0.0",
+    "6to5-core": "^3.5.3",
+    "webpack": "^1.5.3"
+  },
+  "devDependencies": {
+    "6to5-loader": "^3.0.0",
+    "jsx-loader": "^0.12.2",
+    "react": "^0.12.2",
+    "react-hot-loader": "^1.1.4",
+    "webpack-dev-server": "^1.7.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/supershabam/synth"
+  },
+  "author": "Ian Hansen",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/supershabam/synth/issues"
+  },
+  "homepage": "https://github.com/supershabam/synth"
+}

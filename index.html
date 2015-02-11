@@ -1,139 +1,130 @@
 <!DOCTYPE html>
-<script src="/jsx.transformer.js"></script>
-<script src="/react.js"></script>
-<script src="/rx.all.js"></script>
-<script src="/kb2midi.js"></script>
-<script src="/oscope.js" type="text/jsx"></script>
-
 <script>
-(function() {
+// (function() {
 
-var midiToFrequency = function(key) {
-  // http://newt.phys.unsw.edu.au/jw/notes.html
-  // http://en.wikipedia.org/wiki/MIDI_Tuning_Standard
-  return Math.pow(2, (key - 69)/12.0) * 440
-}
-
-function Synth(audioCtx, midiKeys) {
-  this.voices = {}
-  this.output = audioCtx.createGain()
-  this.audioCtx = audioCtx
-  midiKeys.subscribe(this.onmidikey.bind(this))
-}
-
-Synth.prototype.onmidikey = function(midiKey) {
-  if (this.voices[midiKey.note] && midiKey.velocity == 0) {
-    // kill voice
-    this.voices[midiKey.note].stop()
-    delete this.voices[midiKey.note]
-  } else if (this.voices[midiKey.note]) {
-    // update voice
-    this.voices[midiKey.note].velocity = midiKey.velocity
-  } else {
-    // add voice
-    this.voices[midiKey.note] = new Voice(this.audioCtx, midiKey.note, midiKey.velocity)
-  }
-  // TODO
-  // if (Object.keys(this.voices).length > 5) {
-  //   // crop voices if there are too many
-  // }
-  console.log(this.voices)
-
-}
-
-function Voice(audioCtx, midiNote, midiVelocity) {
-  this.audioCtx = audioCtx
-  this.osc1 = audioCtx.createOscillator()
-  this.osc2 = audioCtx.createOscillator()
-  this.pfm = audioCtx.createGain()
-  this.f1 = audioCtx.createBiquadFilter()
-  this.f2 = audioCtx.createBiquadFilter()
-  this.amp1 = audioCtx.createGain()
-  this.amp2 = audioCtx.createGain()
-
-  this.osc1.type = 'saw'
-  this.osc1.frequency = midiToFrequency(midiNote)
-  this.osc1.start()
-  this.osc2.type = 'saw'
-  this.osc2.frequency = midiToFrequency(midiNote)
-  this.osc2.start()
-
-  this.pfm.gain.value = 1
-
-  this.f1.type = 'lowpass'
-  this.f1.frequency = 2000
-  this.f2.type = 'lowpass'
-  this.f2.frequency = 1500
-
-  this.osc1.connect(this.pfm)
-  this.osc2.connect(this.pfm)
-
-  this.pfm.connect(this.f1)
-  this.pfm.connect(this.f2)
-
-  this.f1.connect(this.f2)
-  this.f1.connect(this.amp1)
-  this.f2.connect(this.amp2)
-
-  // TODO don't connect directly to output
-  this.amp1.connect(audioCtx.destination)
-  this.amp2.connect(audioCtx.destination)
-}
-
-Voice.prototype.stop = function() {
-  this.pfm.gain.cancelScheduledValues(0)
-  this.pfm.gain.exponentialRampToValueAtTime(0.00001, this.audioCtx.currentTime + 1)
-}
-
-
-var audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-var kb2midi = new KB2MIDI()
-var globalGain = audioCtx.createGain()
-window.gain = globalGain
-window.audioCtx = audioCtx
-gain.connect(audioCtx.destination)
-var voices = {}
-kb2midi.subscribe(function(note) {
-  if (!voices[note.note]) {
-    var osc = audioCtx.createOscillator()
-    var gain = audioCtx.createGain()
-    osc.frequency.value = midiToFrequency(note.note)
-    osc.type = 'sawtooth'
-    osc.start()
-    gain.connect(globalGain)
-    osc.connect(gain)
-    voices[note.note] = {
-      osc: osc,
-      gain: gain
-    }
-  }
-  var voice = voices[note.note]
-  if (note.velocity == 0) {
-    // clear effects
-    voice.gain.gain.cancelScheduledValues(audioCtx.currentTime)
-    // release
-    voice.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5)
-  } else {
-    // clear for effect
-    voice.gain.gain.cancelScheduledValues(audioCtx.currentTime)
-    voice.gain.gain.setValueAtTime(0.01, audioCtx.currentTime)
-    // attack
-    voice.gain.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.1)
-    // sustain
-    voice.gain.gain.setTargetAtTime(0.5, audioCtx.currentTime + 0.1, 0.1)
-  }
-})
-// var midiKeys = new MIDIKeyObservable(m)
-// var s = new Synth(audioCtx, midiKeys)
-})()
-
-/*
-stream of observable, cancellable notes
-
-*/
+// var midiToFrequency = function(key) {
+//   // http://newt.phys.unsw.edu.au/jw/notes.html
+//   // http://en.wikipedia.org/wiki/MIDI_Tuning_Standard
+//   return Math.pow(2, (key - 69)/12.0) * 440
+// }
+//
+// function Synth(audioCtx, midiKeys) {
+//   this.voices = {}
+//   this.output = audioCtx.createGain()
+//   this.audioCtx = audioCtx
+//   midiKeys.subscribe(this.onmidikey.bind(this))
+// }
+//
+// Synth.prototype.onmidikey = function(midiKey) {
+//   if (this.voices[midiKey.note] && midiKey.velocity == 0) {
+//     // kill voice
+//     this.voices[midiKey.note].stop()
+//     delete this.voices[midiKey.note]
+//   } else if (this.voices[midiKey.note]) {
+//     // update voice
+//     this.voices[midiKey.note].velocity = midiKey.velocity
+//   } else {
+//     // add voice
+//     this.voices[midiKey.note] = new Voice(this.audioCtx, midiKey.note, midiKey.velocity)
+//   }
+//   // TODO
+//   // if (Object.keys(this.voices).length > 5) {
+//   //   // crop voices if there are too many
+//   // }
+//   console.log(this.voices)
+//
+// }
+//
+// function Voice(audioCtx, midiNote, midiVelocity) {
+//   this.audioCtx = audioCtx
+//   this.osc1 = audioCtx.createOscillator()
+//   this.osc2 = audioCtx.createOscillator()
+//   this.pfm = audioCtx.createGain()
+//   this.f1 = audioCtx.createBiquadFilter()
+//   this.f2 = audioCtx.createBiquadFilter()
+//   this.amp1 = audioCtx.createGain()
+//   this.amp2 = audioCtx.createGain()
+//
+//   this.osc1.type = 'saw'
+//   this.osc1.frequency = midiToFrequency(midiNote)
+//   this.osc1.start()
+//   this.osc2.type = 'saw'
+//   this.osc2.frequency = midiToFrequency(midiNote)
+//   this.osc2.start()
+//
+//   this.pfm.gain.value = 1
+//
+//   this.f1.type = 'lowpass'
+//   this.f1.frequency = 2000
+//   this.f2.type = 'lowpass'
+//   this.f2.frequency = 1500
+//
+//   this.osc1.connect(this.pfm)
+//   this.osc2.connect(this.pfm)
+//
+//   this.pfm.connect(this.f1)
+//   this.pfm.connect(this.f2)
+//
+//   this.f1.connect(this.f2)
+//   this.f1.connect(this.amp1)
+//   this.f2.connect(this.amp2)
+//
+//   // TODO don't connect directly to output
+//   this.amp1.connect(audioCtx.destination)
+//   this.amp2.connect(audioCtx.destination)
+// }
+//
+// Voice.prototype.stop = function() {
+//   this.pfm.gain.cancelScheduledValues(0)
+//   this.pfm.gain.exponentialRampToValueAtTime(0.00001, this.audioCtx.currentTime + 1)
+// }
+//
+//
+// var audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+// var kb2midi = new KB2MIDI()
+// var globalGain = audioCtx.createGain()
+// window.gain = globalGain
+// window.audioCtx = audioCtx
+// gain.connect(audioCtx.destination)
+// var voices = {}
+// kb2midi.subscribe(function(note) {
+//   if (!voices[note.note]) {
+//     var osc = audioCtx.createOscillator()
+//     var gain = audioCtx.createGain()
+//     osc.frequency.value = midiToFrequency(note.note)
+//     osc.type = 'sawtooth'
+//     osc.start()
+//     gain.connect(globalGain)
+//     osc.connect(gain)
+//     voices[note.note] = {
+//       osc: osc,
+//       gain: gain
+//     }
+//   }
+//   var voice = voices[note.note]
+//   if (note.velocity == 0) {
+//     // clear effects
+//     voice.gain.gain.cancelScheduledValues(audioCtx.currentTime)
+//     // release
+//     voice.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5)
+//   } else {
+//     // clear for effect
+//     voice.gain.gain.cancelScheduledValues(audioCtx.currentTime)
+//     voice.gain.gain.setValueAtTime(0.01, audioCtx.currentTime)
+//     // attack
+//     voice.gain.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.1)
+//     // sustain
+//     voice.gain.gain.setTargetAtTime(0.5, audioCtx.currentTime + 0.1, 0.1)
+//   }
+// })
+// // var midiKeys = new MIDIKeyObservable(m)
+// // var s = new Synth(audioCtx, midiKeys)
+// })()
+//
+// /*
+// stream of observable, cancellable notes
+//
+// */
 </script>
 <div id="oscope"></div>
-<script type="text/jsx">
-React.render(<Oscope source={window.gain} audioCtx={window.audioCtx} />, document.getElementById('oscope'))
-</script>
-<script src="/record.js"></script>
+<script src="/dist/bundle.js"></script>
